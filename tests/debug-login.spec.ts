@@ -32,7 +32,7 @@ test('Debug: Kitchen Login Flow', async ({ page }) => {
     
     // Check what's in the DOM
     const formAction = await page.$eval('form', (f) => (f as HTMLFormElement).action).catch(() => 'no form');
-    const buttonType = await page.$eval('button[type="submit"]', (b) => b.type).catch(() => 'no button');
+    const buttonType = await page.$eval('button[type="submit"]', (b) => (b as HTMLButtonElement).type).catch(() => 'no button');
     console.log('Form action:', formAction, 'Button type:', buttonType);
     
     await page.fill('input[type="email"]', testEmail);

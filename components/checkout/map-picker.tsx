@@ -8,7 +8,8 @@ import 'leaflet/dist/leaflet.css'
 const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false })
 const TileLayer = dynamic(() => import('react-leaflet').then(m => m.TileLayer), { ssr: false })
 const Marker = dynamic(() => import('react-leaflet').then(m => m.Marker), { ssr: false })
-const useMapEvents = dynamic(() => import('react-leaflet').then(m => m.useMapEvents), { ssr: false })
+// useMapEvents is a hook — must be imported directly, not via dynamic()
+import { useMapEvents } from 'react-leaflet'
 
 // Center of Karachi
 const defaultCenter = {
