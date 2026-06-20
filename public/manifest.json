@@ -1,0 +1,21 @@
+{
+  "name": "Pizza Master G",
+  "short_name": "PizzaMaster",
+  "description": "Elite Food Delivery & Kitchen Operations",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#FF4500",
+  "icons": [
+    {
+      "src": "/chef-logo-removebg-preview.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/chef-logo-removebg-preview.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
