@@ -109,9 +109,7 @@ export function OrdersModal() {
             id: currentItem.id,
             name: currentItem.name,
             price: currentItem.price,
-            qty: pastItem.qty,
-            category: currentItem.category,
-            available: true
+            image: currentItem.image || ''
           })
           addedCount++
         } else {

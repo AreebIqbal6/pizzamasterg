@@ -57,11 +57,6 @@ export default function RootLayout({
                 fontSize: '14px',
                 fontWeight: '500',
               },
-              success: {
-                style: {
-                  borderColor: '#10b981',
-                },
-              },
             }}
           />
         </ErrorBoundary>

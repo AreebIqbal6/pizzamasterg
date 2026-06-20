@@ -11,11 +11,11 @@ export function createClient() {
           const cookieStore = await cookies()
           return cookieStore.getAll() 
         },
-        async setAll(cookiesToSet) {
+        async setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
           try {
             const cookieStore = await cookies()
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, options as any)
             )
           } catch (error) {}
         },

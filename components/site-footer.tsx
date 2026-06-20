@@ -154,7 +154,7 @@ export function SiteFooter() {
         </div>
       </div>
       
-      <ReviewModal isOpen={isReviewOpen} onClose={() => setIsReviewOpen(false)} />
+      <ReviewModal isOpen={isReviewOpen} orderId={null} onClose={() => setIsReviewOpen(false)} />
     </footer>
   )
 }

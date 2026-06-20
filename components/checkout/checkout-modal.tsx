@@ -41,7 +41,7 @@ type UpsellItem = {
 
 export function CheckoutModal() {
   const router = useRouter()
-  const { overlay, closeOverlay, openOverlay, items, subtotal, addItem, discount, applyDiscount, total, clearCart, user } = useStore()
+  const { overlay, closeOverlay, openOverlay, items, subtotal, addItem, discount, total, clearCart, user } = useStore()
   const open = overlay === "checkout"
 
   const [step, setStep] = useState(0)
@@ -54,6 +54,7 @@ export function CheckoutModal() {
   
   const [checkoutCode, setCheckoutCode] = useState("")
   const [promoMessage, setPromoMessage] = useState<{ text: string, type: 'error' | 'success' } | null>(null)
+  const [localDiscount, setLocalDiscount] = useState(0)
   const [upsells, setUpsells] = useState<UpsellItem[]>([])
   
   const [otpStep, setOtpStep] = useState<'idle' | 'sending' | 'sent' | 'verifying' | 'verified'>('idle')
@@ -109,10 +110,10 @@ export function CheckoutModal() {
 
     if (data.valid) {
       setPromoMessage({ text: data.message, type: 'success' })
-      applyDiscount(data.discount_amount)
+      setLocalDiscount(data.discount_amount || 0)
     } else {
       setPromoMessage({ text: data.message, type: 'error' })
-      applyDiscount(0)
+      setLocalDiscount(0)
     }
   }
 
@@ -155,7 +156,8 @@ export function CheckoutModal() {
     }
 
     const res = await createOrderAction(orderData)
-    const newOrderId = res?.id || (res && res[0]?.id) // handle array or single object return depending on createOrderAction
+    const resAny = res as any
+    const newOrderId = resAny?.id || (Array.isArray(resAny) && resAny[0]?.id) // handle array or single object return
     
     if (newOrderId) {
       setPlacedOrderId(newOrderId)
@@ -407,7 +409,7 @@ export function CheckoutModal() {
                         </div>
                         <button 
                           onClick={() => {
-                            addItem({ id: upsell.menu_item_id, name: upsell.label, price: upsell.price_override, qty: 1, category: "Drinks", available: true })
+                            addItem({ id: upsell.menu_item_id, name: upsell.label, price: upsell.price_override, image: '' })
                             toast.success(`${upsell.label} added!`)
                           }}
                           className="rounded-md bg-secondary px-3 py-1.5 text-xs font-bold hover:bg-accent hover:text-accent-foreground transition"
@@ -455,10 +457,10 @@ export function CheckoutModal() {
                   </div>
                   <button 
                     onClick={verifyAndPlaceOrder} 
-                    disabled={isSubmitting || otpStep === 'verifying'}
+                    disabled={isSubmitting}
                     className="w-full flex items-center justify-center gap-2 rounded-md bg-accent py-4 text-base font-bold text-accent-foreground transition shadow-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {otpStep === 'verifying' ? <Loader2 className="h-5 w-5 animate-spin" /> : "Verify Code & Place Order"}
+                    {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : "Verify Code & Place Order"}
                   </button>
                   <button onClick={() => setOtpStep('idle')} className="text-xs text-muted-foreground hover:text-foreground text-center w-full mt-2">
                     Cancel or use a different payment method
