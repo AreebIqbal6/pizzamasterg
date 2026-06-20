@@ -36,12 +36,9 @@ function AdminLoginContent() {
         throw new Error("Access Denied: Incorrect Role")
       }
 
-      router.refresh()
-      router.push(
-        nextPath.startsWith('/admin-dashboard') || nextPath.startsWith('/kitchen-dashboard')
-          ? nextPath
-          : '/admin-dashboard'
-      )
+      window.location.href = nextPath.startsWith('/admin-dashboard') || nextPath.startsWith('/kitchen-dashboard')
+        ? nextPath
+        : '/admin-dashboard'
     } catch (err: any) {
       console.error(err)
       setError(err.message || "An unexpected error occurred.")

@@ -46,13 +46,12 @@ function KitchenLoginContent() {
         throw new Error("Access Denied: Incorrect Role")
       }
 
-      router.refresh()
       if (isAdmin && !nextPath.startsWith('/kitchen-dashboard')) {
-        router.push('/admin-dashboard')
+        window.location.href = '/admin-dashboard'
       } else if (nextPath.startsWith('/admin-dashboard') && !isAdmin) {
-        router.push('/kitchen-dashboard')
+        window.location.href = '/kitchen-dashboard'
       } else {
-        router.push(nextPath)
+        window.location.href = nextPath.startsWith('/kitchen-dashboard') ? nextPath : '/kitchen-dashboard'
       }
     } catch (err: any) {
       console.error(err)
