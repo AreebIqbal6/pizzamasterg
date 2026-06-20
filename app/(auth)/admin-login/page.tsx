@@ -79,7 +79,7 @@ function AdminLoginContent() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-accent"
-              placeholder="admin@pizzamaster.com"
+              placeholder="admin@pizzamasterg.com"
               suppressHydrationWarning
             />
           </div>

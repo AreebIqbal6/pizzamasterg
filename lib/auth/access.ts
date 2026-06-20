@@ -4,7 +4,7 @@ export type AuthLikeUser = {
   user_metadata?: Record<string, any> | null
 }
 
-export const ADMIN_EMAIL = "admin@pizzamaster.com"
+export const ADMIN_EMAIL = "admin@pizzamasterg.com"
 
 export const HARDCODED_KITCHEN_EMAILS = [
   "pizzamastergmukkachowk@gmail.com",
