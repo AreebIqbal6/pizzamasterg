@@ -6,6 +6,7 @@ import { KitchenHeader } from "@/components/kitchen/kitchen-header"
 import { Loader2, ArrowLeft, DollarSign, Calculator, CheckCircle } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { resolveKitchenBranch } from "@/lib/auth/branch"
 
 export default function EODPage() {
   const [branchId, setBranchId] = useState<string | null>(null)
@@ -33,18 +34,16 @@ export default function EODPage() {
         return
       }
 
-      const bId = user.user_metadata?.branch_id
-      if (!bId) {
+      const branch = await resolveKitchenBranch(supabase, user)
+      if (!branch) {
         setBranchName("No branch assigned")
         setLoading(false)
         return
       }
 
+      const bId = branch.id
       setBranchId(bId)
-
-      // Get branch name
-      const { data: branch } = await supabase.from('branches').select('name').eq('id', bId).single()
-      if (branch) setBranchName(branch.name)
+      setBranchName(branch.name || "Assigned Branch")
 
       // Check if already submitted today
       const { data: existingEOD } = await supabase

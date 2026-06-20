@@ -3,6 +3,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { sanitizeInput } from '@/lib/sanitize'
 import { cookies, headers } from 'next/headers'
+import { isAdminEmail, isHardcodedKitchenEmail, normalizeEmail } from '@/lib/auth/access'
 
 export async function updateOrderStatus(rawOrderId: string, rawNewStatus: string, rawRiderName?: string, rawCancellationReason?: string) {
   const orderId = sanitizeInput(rawOrderId)
@@ -60,23 +61,50 @@ export async function updateOrderStatus(rawOrderId: string, rawNewStatus: string
   }
 
   const role = user.user_metadata?.role
-  const userBranchId = user.user_metadata?.branch_id
-
-  // Admin bypass
-  const isAdmin = role === 'admin'
+  let userBranchId = user.user_metadata?.branch_id
+  const userEmail = normalizeEmail(user.email)
 
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  if (!isAdmin && role !== 'kitchen' && role !== 'kitchen_staff') {
+  let isAdmin = role === 'admin' || isAdminEmail(userEmail)
+  let isKitchen = role === 'kitchen' || role === 'kitchen_staff' || isHardcodedKitchenEmail(userEmail)
+
+  if (!userBranchId && userEmail) {
+    const { data: branchByEmail } = await supabaseAdmin
+      .from('branches')
+      .select('id')
+      .eq('email', userEmail)
+      .maybeSingle()
+
+    if (branchByEmail?.id) {
+      userBranchId = branchByEmail.id
+      isKitchen = true
+    }
+  }
+
+  if (!userBranchId && user.sub) {
+    const { data: branchByAuthId } = await supabaseAdmin
+      .from('branches')
+      .select('id')
+      .eq('id', user.sub)
+      .maybeSingle()
+
+    if (branchByAuthId?.id) {
+      userBranchId = branchByAuthId.id
+      isKitchen = true
+    }
+  }
+
+  if (!isAdmin && !isKitchen) {
     throw new Error("Unauthorized role")
   }
+  const effectiveRole = isAdmin ? 'admin' : (isKitchen ? 'kitchen' : role)
 
   // If kitchen, ensure they own the order
   let currentAddress = ""
-  const isKitchen = role === 'kitchen' || role === 'kitchen_staff'
   
   if (isKitchen || riderName) {
     const { data: order } = await supabaseAdmin.from('orders').select('branch_id, customer_address').eq('id', orderId).single()
@@ -91,7 +119,7 @@ export async function updateOrderStatus(rawOrderId: string, rawNewStatus: string
     const { error } = await supabaseAdmin.rpc('cancel_order', {
       p_order_id: orderId,
       p_actor_id: user.sub,
-      p_actor_role: role,
+      p_actor_role: effectiveRole,
       p_notes: cancellationReason || 'No reason provided'
     })
     

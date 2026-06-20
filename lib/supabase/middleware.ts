@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { getSafeNextPath, isAdminAuthUser, isKitchenAuthUser, normalizeEmail } from '@/lib/auth/access'
 
 const ROUTE_CONFIG = [
   { path: '/admin-dashboard', requiredRoles: ['admin'], fallback: '/admin-login' },
@@ -37,6 +38,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const path = request.nextUrl.pathname
+  const nextPath = `${request.nextUrl.pathname}${request.nextUrl.search}`
 
   if (path.startsWith('/api/')) {
     return supabaseResponse
@@ -48,21 +50,31 @@ export async function updateSession(request: NextRequest) {
   if (routeMatch) {
     if (!user) {
       const redirectUrl = new URL(routeMatch.fallback, request.url)
-      redirectUrl.searchParams.set('next', path)
+      redirectUrl.searchParams.set('next', getSafeNextPath(nextPath, routeMatch.path))
       return NextResponse.redirect(redirectUrl)
     }
 
-    const userRole = user.user_metadata?.role || ''
-    const userEmail = user.email?.toLowerCase() || ''
-    
-    const hasRequiredRole = routeMatch.requiredRoles.some(role => 
-      userRole === role || 
-      (role === 'admin' && userEmail === 'admin@pizzamasterg.com') ||
-      (role === 'kitchen' && userEmail.includes('pizzamasterg'))
-    )
+    let hasRequiredRole = false
+
+    if (routeMatch.path === '/admin-dashboard') {
+      hasRequiredRole = isAdminAuthUser(user)
+    } else if (routeMatch.path === '/kitchen-dashboard') {
+      hasRequiredRole = isAdminAuthUser(user) || isKitchenAuthUser(user)
+
+      if (!hasRequiredRole) {
+        const { data: branchByEmail } = await supabase
+          .from('branches')
+          .select('id')
+          .eq('email', normalizeEmail(user.email))
+          .maybeSingle()
+
+        hasRequiredRole = !!branchByEmail
+      }
+    }
 
     if (!hasRequiredRole) {
       const redirectUrl = new URL(routeMatch.fallback, request.url)
+      redirectUrl.searchParams.set('next', getSafeNextPath(nextPath, routeMatch.path))
       return NextResponse.redirect(redirectUrl)
     }
   }

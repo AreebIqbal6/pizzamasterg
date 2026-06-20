@@ -3,17 +3,18 @@
 import { useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { getSafeNextPath, isAdminAuthUser } from "@/lib/auth/access"
 import Image from "next/image"
 
 function AdminLoginContent() {
-  const [email, setEmail] = useState("")
+  const searchParams = useSearchParams()
+  const [email, setEmail] = useState(() => searchParams.get("email") || "")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   
-  const searchParams = useSearchParams()
   const router = useRouter()
-  const nextPath = searchParams.get("next") || "/admin-dashboard"
+  const nextPath = getSafeNextPath(searchParams.get("next"), "/admin-dashboard")
   
   const supabase = createClient()
 
@@ -30,17 +31,17 @@ function AdminLoginContent() {
         throw signInError
       }
 
-      const role = data.user?.user_metadata?.role
-      const userEmail = data.user?.email?.toLowerCase() || ''
-      const isAdminEmail = userEmail === 'admin@pizzamasterg.com'
-      
-      if (role !== 'admin' && !isAdminEmail) {
+      if (!isAdminAuthUser(data.user)) {
         await supabase.auth.signOut()
         throw new Error("Access Denied: Incorrect Role")
       }
 
       router.refresh()
-      router.push(nextPath)
+      router.push(
+        nextPath.startsWith('/admin-dashboard') || nextPath.startsWith('/kitchen-dashboard')
+          ? nextPath
+          : '/admin-dashboard'
+      )
     } catch (err: any) {
       console.error(err)
       setError(err.message || "An unexpected error occurred.")
@@ -78,7 +79,7 @@ function AdminLoginContent() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-accent"
-              placeholder="admin@pizzamasterg.com"
+              placeholder="admin@pizzamaster.com"
               suppressHydrationWarning
             />
           </div>

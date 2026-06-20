@@ -6,6 +6,7 @@ import { KitchenHeader } from "@/components/kitchen/kitchen-header"
 import { Loader2, Search, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { resolveKitchenBranch } from "@/lib/auth/branch"
 
 interface MenuItem {
   id: string
@@ -38,25 +39,22 @@ export default function KitchenMenuPage() {
         return
       }
 
-      const bId = user.user_metadata?.branch_id
-      if (!bId) {
+      const branch = await resolveKitchenBranch(supabase, user)
+      if (!branch) {
         setBranchName("No branch assigned")
         setLoading(false)
         return
       }
 
-      setBranchId(bId)
-
-      // Get branch name
-      const { data: branch } = await supabase.from('branches').select('name').eq('id', bId).single()
-      if (branch) setBranchName(branch.name)
+      setBranchId(branch.id)
+      setBranchName(branch.name || "Assigned Branch")
 
       // Fetch all menu items
       const { data: items } = await supabase.from('menu_items').select('id, name, category, price, available').order('category')
       if (items) setMenuItems(items)
 
       // Fetch branch overrides
-      const { data: branchOverrides } = await supabase.from('branch_menu_overrides').select('menu_item_id, is_86ed').eq('branch_id', bId)
+      const { data: branchOverrides } = await supabase.from('branch_menu_overrides').select('menu_item_id, is_86ed').eq('branch_id', branch.id)
       if (branchOverrides) {
         const overrideMap: Record<string, boolean> = {}
         branchOverrides.forEach(o => {

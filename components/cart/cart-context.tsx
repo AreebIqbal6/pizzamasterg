@@ -56,6 +56,7 @@ type StoreContextType = {
 const StoreContext = createContext<StoreContextType | null>(null)
 
 import { validatePromoCode } from "@/app/actions/promo"
+import { isStaffAuthUser } from "@/lib/auth/access"
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])
@@ -86,8 +87,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user: sessionUser } }) => {
       if (sessionUser) {
-        const role = sessionUser.user_metadata?.role
-        if (role === 'admin' || role === 'kitchen' || role === 'kitchen_staff') {
+        if (isStaffAuthUser(sessionUser)) {
           setUser(null)
           return
         }
@@ -103,8 +103,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
-        const role = session.user.user_metadata?.role
-        if (role === 'admin' || role === 'kitchen' || role === 'kitchen_staff') {
+        if (isStaffAuthUser(session.user)) {
           setUser(null)
           return
         }

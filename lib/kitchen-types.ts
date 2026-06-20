@@ -21,6 +21,7 @@ export interface KitchenOrder {
   total: number
   status: OrderStatus
   createdAt: Date
+  time?: string
   branch: string
 }
 

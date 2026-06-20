@@ -17,7 +17,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 
 async function run() {
   console.log("Setting up Admin Accounts...")
-  const admins = ['iqbalareeb26@gmail.com', 'admin@pizzamasterg.com']
+  const admins = ['admin@pizzamaster.com', 'iqbalareeb26@gmail.com']
   for (const email of admins) {
     const { data: user, error: userError } = await supabase.auth.admin.createUser({
       email,
@@ -52,11 +52,12 @@ async function run() {
 
   for (const branch of branches) {
     const email = branch.email || `pizzamasterg${branch.name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}@gmail.com`
+    const password = branch.password || '123456'
     const { data: user, error: userError } = await supabase.auth.admin.createUser({
       email,
-      password: '123456', // I will set 123456 to all branches
+      password,
       email_confirm: true,
-      user_metadata: { role: 'kitchen', raw_password: '123456' }
+      user_metadata: { role: 'kitchen', branch_id: branch.id, raw_password: password }
     })
     
     if (userError && userError.message.includes('already registered')) {
@@ -65,8 +66,8 @@ async function run() {
       const u = list.data.users.find(u => u.email === email)
       if (u) {
          await supabase.auth.admin.updateUserById(u.id, { 
-           password: 'password123', 
-           user_metadata: { role: 'kitchen', raw_password: 'password123' } 
+           password, 
+           user_metadata: { ...(u.user_metadata || {}), role: 'kitchen', branch_id: branch.id, raw_password: password } 
          })
       }
     } else if (userError) {

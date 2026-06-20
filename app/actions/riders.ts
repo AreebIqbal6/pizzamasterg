@@ -7,42 +7,83 @@ import { revalidatePath } from "next/cache"
 import { sanitizeInput } from "@/lib/sanitize"
 
 import { cookies } from "next/headers"
+import { isAdminEmail, isHardcodedKitchenEmail, normalizeEmail } from "@/lib/auth/access"
+
+async function getCurrentStaffAccess() {
+  const cookieStore = await cookies()
+  const allCookies = cookieStore.getAll()
+  const cookieName = 'sb-vxfojrbieoocnkkntraa-auth-token'
+  const tokenCookies = allCookies.filter(c => c.name.startsWith(cookieName)).sort((a, b) => a.name.localeCompare(b.name))
+
+  if (tokenCookies.length === 0) {
+    throw new Error("Not authenticated")
+  }
+
+  let tokenStr = tokenCookies.length === 1 && tokenCookies[0].name === cookieName
+    ? tokenCookies[0].value
+    : tokenCookies.map(c => c.value).join('')
+
+  let accessToken = ""
+  try {
+    const decoded = decodeURIComponent(tokenStr)
+    const parsed = JSON.parse(decoded)
+    accessToken = Array.isArray(parsed) ? parsed[0] : parsed.access_token
+  } catch {
+    accessToken = tokenStr
+  }
+
+  if (!accessToken || !accessToken.includes('.')) {
+    throw new Error("Not authenticated")
+  }
+
+  const payload = accessToken.split('.')[1]
+  const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
+  const user = JSON.parse(Buffer.from(base64, 'base64').toString('utf8'))
+  const role = user.user_metadata?.role
+  const email = normalizeEmail(user.email)
+  let branchId = user.user_metadata?.branch_id
+
+  let isAdmin = role === 'admin' || isAdminEmail(email)
+  let isKitchen = role === 'kitchen' || role === 'kitchen_staff' || isHardcodedKitchenEmail(email)
+
+  if (!branchId && email) {
+    const { data: branchByEmail } = await supabaseAdmin
+      .from('branches')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle()
+
+    if (branchByEmail?.id) {
+      branchId = branchByEmail.id
+      isKitchen = true
+    }
+  }
+
+  if (!branchId && user.sub) {
+    const { data: branchByAuthId } = await supabaseAdmin
+      .from('branches')
+      .select('id')
+      .eq('id', user.sub)
+      .maybeSingle()
+
+    if (branchByAuthId?.id) {
+      branchId = branchByAuthId.id
+      isKitchen = true
+    }
+  }
+
+  if (!isAdmin && !isKitchen) {
+    throw new Error("Unauthorized")
+  }
+
+  return { isAdmin, isKitchen, branchId }
+}
 
 export async function addRider(rawData: { name: string; phone: string; branch_id: string }) {
   const data = sanitizeInput(rawData)
+  const access = await getCurrentStaffAccess()
   
-  const cookieStore = await cookies()
-  const authCookie = cookieStore.get('sb-vxfojrbieoocnkkntraa-auth-token')
-  
-  if (!authCookie) {
-    throw new Error("Not authenticated (No cookie)")
-  }
-
-  let user
-  try {
-    const cookieData = JSON.parse(authCookie.value)
-    const accessToken = Array.isArray(cookieData) ? cookieData[0] : cookieData.access_token
-
-    if (!accessToken) throw new Error("Not authenticated (No token)")
-
-    const payload = accessToken.split('.')[1]
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
-    const jsonPayload = Buffer.from(base64, 'base64').toString('utf8')
-    user = JSON.parse(jsonPayload)
-  } catch (e) {
-    throw new Error("Not authenticated (Decode failed)")
-  }
-  
-  if (!user) throw new Error("Not authenticated")
-  
-  const role = user.user_metadata?.role
-  const userBranchId = user.user_metadata?.branch_id
-  
-  if (role !== 'admin' && role !== 'kitchen' && role !== 'kitchen_staff') {
-    throw new Error("Unauthorized")
-  }
-  
-  if (role !== 'admin' && data.branch_id !== userBranchId) {
+  if (!access.isAdmin && data.branch_id !== access.branchId) {
     throw new Error("Cannot add rider to another branch")
   }
   
@@ -66,21 +107,19 @@ export async function addRider(rawData: { name: string; phone: string; branch_id
 }
 
 export async function toggleRiderStatus(id: string, currentStatus: boolean) {
-  const cookieStore = await cookies()
-  const authCookie = cookieStore.get('sb-vxfojrbieoocnkkntraa-auth-token')
-  if (!authCookie) throw new Error("Not authenticated")
+  const access = await getCurrentStaffAccess()
 
-  let user
-  try {
-    const cookieData = JSON.parse(authCookie.value)
-    const accessToken = Array.isArray(cookieData) ? cookieData[0] : cookieData.access_token
-    const payload = accessToken.split('.')[1]
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
-    user = JSON.parse(Buffer.from(base64, 'base64').toString('utf8'))
-  } catch (e) {
-    throw new Error("Not authenticated")
+  if (!access.isAdmin) {
+    const { data: rider } = await supabaseAdmin
+      .from('riders')
+      .select('branch_id')
+      .eq('id', id)
+      .single()
+
+    if (!rider || rider.branch_id !== access.branchId) {
+      throw new Error("Cannot update rider from another branch")
+    }
   }
-  if (!user) throw new Error("Not authenticated")
 
   const { error } = await supabaseAdmin
     .from('riders')
@@ -96,21 +135,19 @@ export async function toggleRiderStatus(id: string, currentStatus: boolean) {
 }
 
 export async function deleteRider(id: string) {
-  const cookieStore = await cookies()
-  const authCookie = cookieStore.get('sb-vxfojrbieoocnkkntraa-auth-token')
-  if (!authCookie) throw new Error("Not authenticated")
+  const access = await getCurrentStaffAccess()
 
-  let user
-  try {
-    const cookieData = JSON.parse(authCookie.value)
-    const accessToken = Array.isArray(cookieData) ? cookieData[0] : cookieData.access_token
-    const payload = accessToken.split('.')[1]
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
-    user = JSON.parse(Buffer.from(base64, 'base64').toString('utf8'))
-  } catch (e) {
-    throw new Error("Not authenticated")
+  if (!access.isAdmin) {
+    const { data: rider } = await supabaseAdmin
+      .from('riders')
+      .select('branch_id')
+      .eq('id', id)
+      .single()
+
+    if (!rider || rider.branch_id !== access.branchId) {
+      throw new Error("Cannot delete rider from another branch")
+    }
   }
-  if (!user) throw new Error("Not authenticated")
 
   const { error } = await supabaseAdmin
     .from('riders')

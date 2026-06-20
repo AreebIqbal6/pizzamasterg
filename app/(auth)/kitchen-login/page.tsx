@@ -3,17 +3,18 @@
 import { useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { getSafeNextPath, isAdminAuthUser, isKitchenAuthUser, normalizeEmail } from "@/lib/auth/access"
 import Image from "next/image"
 
 function KitchenLoginContent() {
-  const [email, setEmail] = useState("")
+  const searchParams = useSearchParams()
+  const [email, setEmail] = useState(() => searchParams.get("email") || "")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   
-  const searchParams = useSearchParams()
   const router = useRouter()
-  const nextPath = searchParams.get("next") || "/kitchen-dashboard"
+  const nextPath = getSafeNextPath(searchParams.get("next"), "/kitchen-dashboard")
   
   const supabase = createClient()
 
@@ -30,17 +31,29 @@ function KitchenLoginContent() {
         throw signInError
       }
 
-      const role = data.user?.user_metadata?.role
-      const userEmail = data.user?.email?.toLowerCase() || ''
-      const isKitchenEmail = userEmail.includes('pizzamasterg') && userEmail !== 'admin@pizzamasterg.com'
+      const userEmail = normalizeEmail(data.user?.email)
+      const { data: branchByEmail } = await supabase
+        .from('branches')
+        .select('id')
+        .eq('email', userEmail)
+        .maybeSingle()
       
-      if (role !== 'kitchen' && role !== 'kitchen_staff' && !isKitchenEmail) {
+      const isAdmin = isAdminAuthUser(data.user)
+      const isKitchen = isKitchenAuthUser(data.user) || !!branchByEmail
+
+      if (!isAdmin && !isKitchen) {
         await supabase.auth.signOut()
         throw new Error("Access Denied: Incorrect Role")
       }
 
       router.refresh()
-      router.push(nextPath)
+      if (isAdmin && !nextPath.startsWith('/kitchen-dashboard')) {
+        router.push('/admin-dashboard')
+      } else if (nextPath.startsWith('/admin-dashboard') && !isAdmin) {
+        router.push('/kitchen-dashboard')
+      } else {
+        router.push(nextPath)
+      }
     } catch (err: any) {
       console.error(err)
       setError(err.message || "An unexpected error occurred.")
@@ -78,7 +91,7 @@ function KitchenLoginContent() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-accent"
-              placeholder="kitchen@pizzamasterg.com"
+              placeholder="branch@pizzamaster.com"
               suppressHydrationWarning
             />
           </div>

@@ -10,13 +10,13 @@ type Props = {
   order: KitchenOrder | null
   branchId: string | null
   onClose: () => void
-  onStatusChange: (orderId: string, newStatus: OrderStatus, riderName?: string) => void
+  onStatusChange: (orderId: string, newStatus: OrderStatus, riderName?: string, cancellationReason?: string) => void
 }
 
 export function OrderDetailDrawer({ order, branchId, onClose, onStatusChange }: Props) {
   const [isLoading, setIsLoading] = useState(false)
   const [assignedRider, setAssignedRider] = useState("unassigned")
-  const [activeRiders, setActiveRiders] = useState<{ id: string; name: string }[]>([])
+  const [activeRiders, setActiveRiders] = useState<{ id: string; name: string; phone?: string; current_load?: number; max_load?: number }[]>([])
   const [isLoadingRiders, setIsLoadingRiders] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [cancelReason, setCancelReason] = useState("")

@@ -10,6 +10,8 @@ export default function KitchenList({ initialKitchens }: { initialKitchens: any[
   
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingAuthId, setEditingAuthId] = useState<string | null>(null)
+  const [editingHasAccount, setEditingHasAccount] = useState(false)
   
   const [name, setName] = useState("")
   const [location, setLocation] = useState("")
@@ -26,12 +28,16 @@ export default function KitchenList({ initialKitchens }: { initialKitchens: any[
     setError("")
     if (kitchen) {
       setEditingId(kitchen.id)
+      setEditingAuthId(kitchen.auth_id || null)
+      setEditingHasAccount(!!kitchen.has_account)
       setName(kitchen.name || "")
       setLocation(kitchen.location || "")
       setEmail(kitchen.email || "")
       setPassword(kitchen.password !== "Not Set" ? kitchen.password : "")
     } else {
       setEditingId(null)
+      setEditingAuthId(null)
+      setEditingHasAccount(false)
       setName("")
       setLocation("")
       setEmail("")
@@ -54,7 +60,8 @@ export default function KitchenList({ initialKitchens }: { initialKitchens: any[
     try {
       if (editingId) {
         formData.append("id", editingId)
-        formData.append("has_account", "true")
+        if (editingAuthId) formData.append("auth_id", editingAuthId)
+        formData.append("has_account", editingHasAccount ? "true" : "false")
         const res = await updateKitchen(formData)
         if (res.error) throw new Error(res.error)
       } else {

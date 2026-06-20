@@ -10,11 +10,6 @@ export function AuthModal() {
   const { overlay, closeOverlay } = useStore()
   const open = overlay === "auth"
 
-  const handleOAuth = (provider: 'google' | 'facebook') => {
-    // If we're opening auth from checkout, we should redirect back to checkout
-    window.location.href = `/auth/login/${provider}?next=/?openCheckout=true`
-  }
-
   if (!open) return null
 
   return (
@@ -48,7 +43,7 @@ export function AuthModal() {
 
 
         <OTPForm redirectUrl="/?openCheckout=true" openCart="false" />
-        <OAuthButtons />
+        <OAuthButtons redirectUrl="/?openCheckout=true" />
 
       </div>
     </div>

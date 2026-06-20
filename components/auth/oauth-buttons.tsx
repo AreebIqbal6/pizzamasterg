@@ -3,21 +3,24 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-export function OAuthButtons() {
+export function OAuthButtons({ redirectUrl = '/' }: { redirectUrl?: string }) {
   const [isPending, setIsPending] = useState(false)
 
   const handleOAuth = async (provider: 'google' | 'facebook') => {
     setIsPending(true)
     const supabase = createClient()
-    const redirectTo = `${window.location.origin}/auth/callback`
+    const next = redirectUrl || '/'
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+    const queryParams: Record<string, string> =
+      provider === 'google'
+        ? { prompt: 'select_account' }
+        : { scope: 'email,public_profile' }
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
         redirectTo,
-        queryParams: {
-          prompt: 'consent',
-        },
+        queryParams,
       }
     })
     

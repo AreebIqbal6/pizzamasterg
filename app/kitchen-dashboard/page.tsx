@@ -12,6 +12,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { toast } from 'sonner'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
+import { isAdminAuthUser, isKitchenAuthUser, normalizeEmail } from "@/lib/auth/access"
+import { resolveKitchenBranch } from "@/lib/auth/branch"
 
 function KitchenDashboardContent() {
   const searchParams = useSearchParams()
@@ -38,30 +40,25 @@ function KitchenDashboardContent() {
         return
       }
 
-      const email = user.email?.trim().toLowerCase() || ''
-      const role = user.user_metadata?.role
+      const email = normalizeEmail(user.email)
+      const isAdmin = isAdminAuthUser(user)
+      const isKitchen = isKitchenAuthUser(user)
+      const userBranch = await resolveKitchenBranch(supabase, user)
 
-      const isAdminEmail = email === 'admin@pizzamasterg.com'
-      const isKitchenEmail = email === 'pizzamastergmukkachowk@gmail.com' || isAdminEmail
-
-      /*
-      if (role !== 'kitchen' && role !== 'admin' && !isKitchenEmail) {
+      if (!isAdmin && !isKitchen && !userBranch) {
         window.location.href = '/'
         return
       }
-      */
 
-      if ((role === 'admin' || isAdminEmail) && !email.includes('kitchen')) {
+      if (isAdmin && !email.includes('kitchen')) {
         // window.location.href = '/admin-dashboard' 
         // We'll allow admins to view the kitchen dashboard.
       }
 
-      const userBranchId = user.user_metadata?.branch_id
-
-      let targetBranchId = urlBranchId || userBranchId
+      let targetBranchId = urlBranchId || userBranch?.id
 
       if (!targetBranchId) {
-        if (role === 'admin' || isAdminEmail) {
+        if (isAdmin) {
           setSelectedBranch("All Branches (Admin View)")
           const { data: ordersData } = await supabase
             .from('orders')
@@ -79,6 +76,8 @@ function KitchenDashboardContent() {
               delivery_lat: o.delivery_lat,
               delivery_lng: o.delivery_lng,
               delivery_instructions: o.delivery_instructions,
+              subtotal: Number(o.subtotal ?? o.total ?? 0),
+              discount: Number(o.discount ?? 0),
               total: o.total,
               time: new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               createdAt: new Date(o.created_at),
@@ -128,6 +127,8 @@ function KitchenDashboardContent() {
             delivery_lat: o.delivery_lat,
             delivery_lng: o.delivery_lng,
             delivery_instructions: o.delivery_instructions,
+            subtotal: Number(o.subtotal ?? o.total ?? 0),
+            discount: Number(o.discount ?? 0),
             total: o.total,
             time: new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             createdAt: new Date(o.created_at),
@@ -167,6 +168,8 @@ function KitchenDashboardContent() {
                 delivery_lat: newOrder.delivery_lat,
                 delivery_lng: newOrder.delivery_lng,
                 delivery_instructions: newOrder.delivery_instructions,
+                subtotal: Number(newOrder.subtotal ?? newOrder.total ?? 0),
+                discount: Number(newOrder.discount ?? 0),
                 total: newOrder.total,
                 time: new Date(newOrder.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 createdAt: new Date(newOrder.created_at),
@@ -230,7 +233,7 @@ function KitchenDashboardContent() {
     return () => window.removeEventListener('online', syncOfflineQueue)
   }, [])
 
-  const handleStatusChange = async (orderId: string, newStatus: OrderStatus, riderName?: string) => {
+  const handleStatusChange = async (orderId: string, newStatus: OrderStatus, riderName?: string, cancellationReason?: string) => {
     // Find the original status for rollback
     const originalStatus = orders.find(o => o.id === orderId)?.status || 'pending'
 
@@ -251,7 +254,7 @@ function KitchenDashboardContent() {
 
     // Update using Server Action to bypass missing RLS UPDATE policy
     try {
-      await updateOrderStatus(orderId, newStatus, riderName)
+      await updateOrderStatus(orderId, newStatus, riderName, cancellationReason)
       toast.success(`Order ${orderId.slice(0, 8)} status updated to ${newStatus}`)
     } catch (e) {
       console.error("Failed to update order:", e)
@@ -419,7 +422,6 @@ function KitchenDashboardContent() {
             </p>
           </div>
         )}
-        </div>
       </main>
 
       {/* Powered by Skillora Footer */}
@@ -436,9 +438,9 @@ function KitchenDashboardContent() {
       {/* Detail Drawer */}
       <OrderDetailDrawer 
         order={selectedOrder}
-        open={!!selectedOrder}
+        branchId={branchId}
         onClose={() => setSelectedOrder(null)}
-        onUpdateStatus={handleStatusChange}
+        onStatusChange={handleStatusChange}
       />
     </div>
   )

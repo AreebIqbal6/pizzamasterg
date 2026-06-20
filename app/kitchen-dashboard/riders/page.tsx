@@ -7,6 +7,7 @@ import { Users, Plus, CheckCircle, XCircle, Trash2, Loader2 } from "lucide-react
 import { addRider, toggleRiderStatus, deleteRider } from "@/app/actions/riders"
 import { toast } from "sonner"
 import Link from "next/link"
+import { resolveKitchenBranch } from "@/lib/auth/branch"
 
 type Rider = {
   id: string
@@ -51,26 +52,16 @@ export default function ManageRidersPage() {
         return
       }
 
-      const userBranchId = user.user_metadata?.branch_id
-      if (!userBranchId) {
+      const branch = await resolveKitchenBranch(supabase, user)
+      if (!branch) {
         setSelectedBranch("No Branch Assigned")
         setLoading(false)
         return
       }
-
-      const { data: branch } = await supabase
-        .from('branches')
-        .select('id, name')
-        .eq('id', userBranchId)
-        .single()
         
-      if (branch) {
-        setBranchId(branch.id)
-        setSelectedBranch(branch.name)
-        await fetchRiders(branch.id)
-      } else {
-        setSelectedBranch("Branch not found")
-      }
+      setBranchId(branch.id)
+      setSelectedBranch(branch.name || "Assigned Branch")
+      await fetchRiders(branch.id)
       setLoading(false)
     }
     init()
