@@ -1,65 +1,13 @@
-"use client"
-
-import { useState, Suspense } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
-import { getSafeNextPath, isAdminAuthUser, isKitchenAuthUser, normalizeEmail } from "@/lib/auth/access"
 import Image from "next/image"
+import { kitchenLoginAction } from "@/app/actions/login"
 
-function KitchenLoginContent() {
-  const searchParams = useSearchParams()
-  const [email, setEmail] = useState(() => searchParams.get("email") || "")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  
-  const router = useRouter()
-  const nextPath = getSafeNextPath(searchParams.get("next"), "/kitchen-dashboard")
-  
-  const supabase = createClient()
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
-    
-    try {
-      await supabase.auth.signOut()
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
-      
-      if (signInError) {
-        throw signInError
-      }
-
-      const userEmail = normalizeEmail(data.user?.email)
-      const { data: branchByEmail } = await supabase
-        .from('branches')
-        .select('id')
-        .eq('email', userEmail)
-        .maybeSingle()
-      
-      const isAdmin = isAdminAuthUser(data.user)
-      const isKitchen = isKitchenAuthUser(data.user) || !!branchByEmail
-
-      if (!isAdmin && !isKitchen) {
-        await supabase.auth.signOut()
-        throw new Error("Access Denied: Incorrect Role")
-      }
-
-      if (isAdmin && !nextPath.startsWith('/kitchen-dashboard')) {
-        window.location.href = '/admin-dashboard'
-      } else if (nextPath.startsWith('/admin-dashboard') && !isAdmin) {
-        window.location.href = '/kitchen-dashboard'
-      } else {
-        window.location.href = nextPath.startsWith('/kitchen-dashboard') ? nextPath : '/kitchen-dashboard'
-      }
-    } catch (err: any) {
-      console.error(err)
-      setError(err.message || "An unexpected error occurred.")
-    } finally {
-      setLoading(false)
-    }
-  }
+export default async function KitchenLogin({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>
+}) {
+  const params = await searchParams
+  const error = params.error
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -80,57 +28,45 @@ function KitchenLoginContent() {
           </p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-4" suppressHydrationWarning>
+        <form action={kitchenLoginAction} className="space-y-4">
           <div>
             <label className="text-sm font-medium text-foreground" htmlFor="email">Branch Email</label>
             <input
               id="email"
+              name="email"
               type="email"
               required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+              autoComplete="email"
               className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-accent"
-              placeholder="branch@pizzamaster.com"
-              suppressHydrationWarning
+              placeholder="branch@pizzamasterg.com"
             />
           </div>
           <div>
             <label className="text-sm font-medium text-foreground" htmlFor="password">Password</label>
             <input
               id="password"
+              name="password"
               type="password"
               required
-              value={password}
-              onChange={e => setPassword(e.target.value)}
+              autoComplete="current-password"
               className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-accent"
               placeholder="Enter password"
-              suppressHydrationWarning
             />
           </div>
           <button
             type="submit"
-            disabled={loading}
-            className="mt-2 w-full rounded-md bg-accent py-3 text-sm font-bold text-accent-foreground hover:opacity-90 transition disabled:opacity-50"
-            suppressHydrationWarning
+            className="mt-2 w-full rounded-md bg-accent py-3 text-sm font-bold text-accent-foreground hover:opacity-90 transition"
           >
-            {loading ? 'Signing In...' : 'Sign In'}
+            Sign In
           </button>
         </form>
 
         {error && (
           <div className="mt-4 rounded-md bg-destructive/15 p-3 text-center text-sm font-medium text-destructive border border-destructive/30">
-            {error}
+            {decodeURIComponent(error)}
           </div>
         )}
       </div>
     </div>
-  )
-}
-
-export default function KitchenLogin() {
-  return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
-      <KitchenLoginContent />
-    </Suspense>
   )
 }
